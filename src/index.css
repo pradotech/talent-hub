@@ -1,0 +1,32 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased overflow-x-hidden;
+  }
+
+  ::selection {
+    background-color: #e9f2dc;
+    color: #084734;
+  }
+
+  /* Títulos oficiais com o tracking sutil do manual da FIA (-20 a 0) */
+  h1, h2, h3, h4, h5, h6 {
+    @apply tracking-tighter text-slate-900;
+  }
+}
+
+/* Utilitários oficiais da identidade da FIA Business School */
+.bg-fia-gradient-luz {
+  background: linear-gradient(135deg, #c3fa75 0%, #75a365 50%, #084734 100%);
+}
+
+.bg-fia-gradient-suave {
+  background: linear-gradient(135deg, #e9f2dc 0%, #ffffff 100%);
+}
