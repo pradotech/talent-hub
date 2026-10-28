@@ -11,6 +11,7 @@ import { AlunoVagasPage } from './pages/AlunoVagasPage';
 import { AlunoCurriculoPage } from './pages/AlunoCurriculoPage';
 import { AlunoCandidaturasPage } from './pages/AlunoCandidaturasPage';
 import { AlunoCadastrarVagaPage } from './pages/AlunoCadastrarVagaPage';
+import { AlunoOnboardingPage } from './pages/AlunoOnboardingPage';
 
 const RootRedirect: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -31,6 +32,11 @@ const RootRedirect: React.FC = () => {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
+  // Se o aluno ainda não completou o perfil no primeiro acesso
+  if (user.perfilCompleto === false) {
+    return <Navigate to="/aluno/onboarding" replace />;
+  }
+
   return <Navigate to="/aluno/recomendacoes" replace />;
 };
 
@@ -43,11 +49,11 @@ const AppLayout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     setSidebarOpen(false);
   }, [location.pathname]);
 
-  // Na página de login não renderizamos a sidebar lateral
-  const isLoginPage = location.pathname === '/login';
+  // Na página de login e onboarding não renderizamos a sidebar lateral completa
+  const isCleanLayout = location.pathname === '/login' || location.pathname === '/aluno/onboarding';
 
-  if (isLoginPage) {
-    return <div className="h-screen w-full overflow-hidden bg-slate-50">{children}</div>;
+  if (isCleanLayout) {
+    return <div className="min-h-screen w-full bg-slate-50">{children}</div>;
   }
 
   return (
@@ -116,6 +122,18 @@ const AlunoOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   return <>{children}</>;
 };
 
+const OnboardingRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, role, isLoading } = useAuth();
+  if (isLoading) return null;
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  if (role === 'admin') {
+    return <Navigate to="/admin/dashboard" replace />;
+  }
+  return <>{children}</>;
+};
+
 const VagasRedirect: React.FC = () => {
   const location = useLocation();
   return <Navigate to={`/aluno/vagas${location.search}`} replace />;
@@ -129,6 +147,16 @@ export const App: React.FC = () => {
           <Routes>
             <Route path="/" element={<RootRedirect />} />
             <Route path="/login" element={<LoginPage />} />
+
+            {/* Fluxo de Primeiro Acesso do Aluno (Onboarding) */}
+            <Route
+              path="/aluno/onboarding"
+              element={
+                <OnboardingRoute>
+                  <AlunoOnboardingPage />
+                </OnboardingRoute>
+              }
+            />
 
             {/* Rotas Exclusivas de Administrador */}
             <Route
@@ -157,7 +185,7 @@ export const App: React.FC = () => {
             />
             <Route path="/professor/*" element={<Navigate to="/admin/dashboard" replace />} />
 
-            {/* Rotas Exclusivas de Aluno (Admin não acessa) */}
+            {/* Rotas Exclusivas de Aluno */}
             <Route
               path="/aluno/recomendacoes"
               element={
@@ -192,7 +220,7 @@ export const App: React.FC = () => {
             />
             <Route path="/aluno/indicar-vaga" element={<Navigate to="/aluno/cadastrar-vaga" replace />} />
 
-            {/* Mural de Vagas (Acesso Geral / Aluno, com visualização adaptada para Admin) */}
+            {/* Mural de Vagas */}
             <Route
               path="/aluno/vagas"
               element={

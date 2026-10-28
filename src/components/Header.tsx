@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { Menu, Building2, LogOut, User as UserIcon } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
@@ -8,6 +9,12 @@ interface HeaderProps {
 
 export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = async () => {
+    await logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
     <header className="h-16 bg-[#142d59] border-b border-[#0f2347] sticky top-0 z-30 flex items-center justify-between px-3 sm:px-6 lg:px-8 text-white shadow-xs">
@@ -38,7 +45,11 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
       {/* Canto superior direito: Usuário e Sair */}
       {user && (
         <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
-          <div className="flex items-center gap-2 text-right">
+          <Link
+            to={user.tipo === 'aluno' ? '/aluno/curriculo' : '/admin/dashboard'}
+            className="flex items-center gap-2 text-right hover:opacity-90 transition-opacity cursor-pointer"
+            title="Ver meu perfil acadêmico e competências"
+          >
             <div className="w-7 h-7 rounded-full bg-white/15 border border-white/25 flex items-center justify-center text-white shrink-0">
               <UserIcon className="w-3.5 h-3.5 text-fia-lime" />
             </div>
@@ -50,12 +61,12 @@ export const Header: React.FC<HeaderProps> = ({ onOpenSidebar }) => {
                 {user.tipo === 'admin' ? 'Administrador' : 'Aluno'} • FIA
               </p>
             </div>
-          </div>
+          </Link>
 
           <div className="h-6 w-px bg-white/20" />
 
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-200 hover:text-white hover:bg-white/15 border border-white/20 hover:border-white/40 transition-all cursor-pointer"
             title="Encerrar sessão"
             aria-label="Sair da plataforma"

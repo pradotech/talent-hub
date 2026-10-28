@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { user, role, switchRole, logout } = useAuth();
+  const { user, role, logout } = useAuth();
   const location = useLocation();
 
   const isActive = (path: string) => location.pathname === path;
@@ -61,7 +61,7 @@ export const Navbar: React.FC = () => {
                   }`}
                 >
                   <Briefcase className="w-3.5 h-3.5 text-slate-500" />
-                  Todas as Vagas
+                  Mural de Vagas
                 </Link>
                 <Link
                   to="/aluno/candidaturas"
@@ -72,7 +72,7 @@ export const Navbar: React.FC = () => {
                   }`}
                 >
                   <UserCheck className="w-3.5 h-3.5 text-slate-500" />
-                  Minhas Candidaturas
+                  Candidaturas
                 </Link>
                 <Link
                   to="/aluno/curriculo"
@@ -83,23 +83,12 @@ export const Navbar: React.FC = () => {
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5 text-slate-500" />
-                  Currículo & Skills
-                </Link>
-                <Link
-                  to="/aluno/indicar-vaga"
-                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-                    isActive('/aluno/indicar-vaga')
-                      ? 'bg-slate-100 text-fia-navy font-semibold'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  <PlusCircle className="w-3.5 h-3.5 text-slate-500" />
-                  Compartilhar Vaga
+                  Meu Currículo
                 </Link>
               </nav>
             )}
 
-            {/* Links de navegação para Administrador */}
+            {/* Links de navegação para Admin */}
             {role === 'admin' && (
               <nav className="hidden md:flex items-center gap-1">
                 <Link
@@ -111,7 +100,7 @@ export const Navbar: React.FC = () => {
                   }`}
                 >
                   <Layers className="w-3.5 h-3.5 text-slate-500" />
-                  Gestão de Vagas
+                  Painel de Vagas
                 </Link>
                 <Link
                   to="/admin/nova-vaga"
@@ -128,38 +117,10 @@ export const Navbar: React.FC = () => {
             )}
           </div>
 
-          {/* Área de usuário e alternador de perfil */}
+          {/* Área de usuário */}
           <div className="flex items-center gap-3">
-            {/* Seletor de simulação de perfil */}
-            <div className="hidden sm:flex items-center bg-slate-100 p-0.5 rounded border border-slate-200">
-              <button
-                type="button"
-                onClick={() => switchRole('admin')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-colors ${
-                  role === 'admin'
-                    ? 'bg-white text-fia-navy shadow-xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title="Trocar para visão de Administrador"
-              >
-                Admin
-              </button>
-              <button
-                type="button"
-                onClick={() => switchRole('aluno')}
-                className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded transition-colors ${
-                  role === 'aluno'
-                    ? 'bg-white text-fia-navy shadow-xs font-semibold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-                title="Trocar para visão de Aluno"
-              >
-                Aluno
-              </button>
-            </div>
-
             {user ? (
-              <div className="flex items-center gap-3 pl-2 border-l border-slate-200">
+              <div className="flex items-center gap-3 pl-2">
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-medium text-slate-800 leading-tight">{user.nome}</p>
                   <p className="text-[10px] text-slate-500 capitalize">{user.tipo} FIA</p>

@@ -7,11 +7,9 @@ import { candidaturasService } from '../services/candidaturasService';
 import type { Vaga, Aluno, Candidatura } from '../types';
 import { VagaCard } from '../components/VagaCard';
 import { Modal } from '../components/Modal';
-import { Button } from '../components/Button';
-import { Tag } from '../components/Tag';
-import { formatDate } from '../lib/utils';
-import { formatVagaForSharing, getWhatsAppShareUrl, getVagaSystemUrl } from '../lib/shareUtils';
-import { Search, MapPin, Calendar, DollarSign, CheckCircle2, Building2, Link as LinkIcon, Copy } from 'lucide-react';
+import { formatDate, calculateAdherence } from '../lib/utils';
+import { getWhatsAppShareUrl, getVagaSystemUrl } from '../lib/shareUtils';
+import { Search, MapPin, Calendar, DollarSign, CheckCircle2, Building2, Copy } from 'lucide-react';
 
 export const AlunoVagasPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -41,7 +39,20 @@ export const AlunoVagasPage: React.FC = () => {
         alunoData ? candidaturasService.getCandidaturasByAluno(alunoData.id) : [],
       ]);
 
-      setVagas(vagasData);
+      const processedVagas = alunoData && alunoData.competencias && alunoData.competencias.length > 0
+        ? vagasData.map((vaga) => {
+            const { aderenciaPorcentagem, competenciasEmComum, competenciasFaltantes } =
+              calculateAdherence(alunoData.competencias, vaga.competenciasNecessarias);
+            return {
+              ...vaga,
+              aderenciaPorcentagem,
+              competenciasEmComum,
+              competenciasFaltantes,
+            };
+          })
+        : vagasData;
+
+      setVagas(processedVagas as Vaga[]);
       setCandidaturas(candsData);
     } finally {
       setIsLoading(false);
@@ -216,118 +227,183 @@ export const AlunoVagasPage: React.FC = () => {
       <Modal
         isOpen={!!selectedVaga}
         onClose={handleCloseModal}
-        title={selectedVaga?.titulo || 'Detalhes da Vaga'}
+        title={selectedVaga?.titulo || 'Detalhes da Oportunidade'}
         subtitle={selectedVaga?.empresa}
-        maxWidth="lg"
+        maxWidth="xl"
+        hideHeader={true}
       >
         {selectedVaga && (
-          <div className="space-y-4 text-xs text-slate-700">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 p-3 bg-slate-50 border border-slate-200 rounded">
-              <div className="flex items-center gap-1.5">
-                <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span>Modalidade: {selectedVaga.modalidade}</span>
-              </div>
-              {selectedVaga.remuneracao && (
-                <div className="flex items-center gap-1.5">
-                  <DollarSign className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                  <span>Bolsa: {selectedVaga.remuneracao}</span>
+          <div className="space-y-6 text-left">
+            {/* Cabeçalho Visual da Oportunidade */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+              <div className="flex items-center gap-3.5">
+                <div className="w-12 h-12 rounded-xl bg-[#142d59]/5 border border-[#142d59]/15 flex items-center justify-center shrink-0 text-[#142d59] font-bold text-lg">
+                  {selectedVaga.empresa ? selectedVaga.empresa.charAt(0).toUpperCase() : 'V'}
                 </div>
-              )}
-              <div className="flex items-center gap-1.5">
-                <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span>Empresa: {selectedVaga.empresa}</span>
+                <div>
+                  <h3 className="text-xl font-bold text-slate-900 tracking-tight capitalize leading-snug">
+                    {selectedVaga.titulo}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-2 mt-1 text-xs text-slate-500">
+                    <span className="font-semibold text-slate-800 flex items-center gap-1">
+                      <Building2 className="w-3.5 h-3.5 text-slate-400" />
+                      {selectedVaga.empresa}
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                      {selectedVaga.modalidade}
+                    </span>
+                    <span>•</span>
+                    <span className="flex items-center gap-1">
+                      <DollarSign className="w-3.5 h-3.5 text-slate-400" />
+                      {selectedVaga.remuneracao || 'A combinar'}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                <span>Prazo: {formatDate(selectedVaga.dataLimite)}</span>
+
+              {/* Tag de prazo */}
+              <div className="flex items-center gap-1.5 self-start sm:self-center px-3 py-1.5 bg-slate-50 rounded-lg border border-slate-200 text-xs text-slate-600">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                <span>Inscrições até <strong>{formatDate(selectedVaga.dataLimite)}</strong></span>
               </div>
             </div>
 
-            <div>
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-1.5">
-                Descrição da Vaga / Atividades
+            {/* Compatibilidade de Competências (para alunos com perfil) */}
+            {'aderenciaPorcentagem' in selectedVaga && typeof (selectedVaga as any).aderenciaPorcentagem === 'number' && (
+              <div className="p-4 bg-[#084734]/5 border border-[#084734]/20 rounded-xl flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#084734] text-fia-lime flex items-center justify-center font-bold text-sm shrink-0">
+                    {(selectedVaga as any).aderenciaPorcentagem}%
+                  </div>
+                  <div>
+                    <h5 className="text-xs font-bold text-[#084734] uppercase tracking-wider">
+                      Aderência de Competências
+                    </h5>
+                    <p className="text-xs text-slate-600 mt-0.5">
+                      Compatibilidade calculada automaticamente com base nas competências extraídas do seu currículo.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Descrição das Atividades */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Sobre a Oportunidade & Atividades
               </h4>
-              <p className="text-xs leading-relaxed text-slate-600">
+              <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-line">
                 {selectedVaga.descricao}
               </p>
             </div>
 
-            <div className="pt-2 border-t border-slate-200">
-              <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2">
-                Competências Requeridas
-              </h4>
-              <div className="flex flex-wrap gap-1.5">
-                {selectedVaga.competenciasNecessarias.map((c) => (
-                  <Tag key={c} label={c} variant="default" size="sm" />
-                ))}
+            {/* Competências Requeridas */}
+            <div className="space-y-2.5 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                  Requisitos & Competências ({selectedVaga.competenciasNecessarias.length})
+                </h4>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {selectedVaga.competenciasNecessarias.map((skill) => {
+                  const isMatched =
+                    'competenciasEmComum' in selectedVaga &&
+                    Array.isArray((selectedVaga as any).competenciasEmComum) &&
+                    (selectedVaga as any).competenciasEmComum.some(
+                      (c: string) => c.toLowerCase() === skill.toLowerCase()
+                    );
+
+                  return (
+                    <span
+                      key={skill}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                        isMatched
+                          ? 'bg-[#084734]/10 text-[#084734] border-[#084734]/30 font-semibold'
+                          : 'bg-slate-50 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {isMatched && <CheckCircle2 className="w-3.5 h-3.5 text-[#084734]" />}
+                      {skill}
+                    </span>
+                  );
+                })}
               </div>
             </div>
 
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-4 border-t border-slate-200">
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const text = formatVagaForSharing(selectedVaga);
-                    await navigator.clipboard.writeText(text);
-                    setFeedbackMessage('Dados e link da vaga copiados para a área de transferência!');
-                  }}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors flex-1 sm:flex-initial"
-                >
-                  <Copy className="w-3.5 h-3.5 text-slate-500" />
-                  Copiar Vaga
-                </button>
+            {/* Mensagem de Feedback de Cópia */}
+            {feedbackMessage && (
+              <div className="p-2.5 text-xs text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg text-center animate-fade-in">
+                {feedbackMessage}
+              </div>
+            )}
+
+            {/* Rodapé Elegante e Limpo */}
+            <div className="pt-5 border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              {/* Compartilhamento à esquerda */}
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={async () => {
                     const link = getVagaSystemUrl(selectedVaga.id);
                     await navigator.clipboard.writeText(link);
-                    setFeedbackMessage('Link direto da vaga copiado com sucesso!');
+                    setFeedbackMessage('Link direto copiado!');
+                    setTimeout(() => setFeedbackMessage(null), 3000);
                   }}
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded text-xs font-medium text-slate-700 bg-white border border-slate-300 hover:bg-slate-50 transition-colors flex-1 sm:flex-initial"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg transition-colors cursor-pointer"
                   title="Copiar link direto para esta vaga"
                 >
-                  <LinkIcon className="w-3.5 h-3.5 text-slate-500" />
-                  Copiar Link
+                  <Copy className="w-3.5 h-3.5 text-slate-400" />
+                  <span>Copiar Link</span>
                 </button>
+
                 <a
                   href={getWhatsAppShareUrl(selectedVaga)}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center justify-center gap-1.5 px-3 py-2 sm:py-1.5 rounded text-xs font-semibold text-emerald-800 bg-emerald-50 border border-emerald-300 hover:bg-emerald-100 transition-colors flex-1 sm:flex-initial"
+                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-emerald-800 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200/80 rounded-lg transition-colors"
+                  title="Compartilhar oportunidade no WhatsApp"
                 >
-                  Enviar no WhatsApp ↗
+                  <span>WhatsApp ↗</span>
                 </a>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <Button variant="outline" size="sm" onClick={handleCloseModal} className="w-full sm:w-auto">
+              {/* Ações de Decisão à direita */}
+              <div className="flex items-center gap-2.5 justify-end">
+                <button
+                  type="button"
+                  onClick={handleCloseModal}
+                  className="px-4 py-2 text-xs font-medium text-slate-600 hover:text-slate-900 bg-transparent hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
                   Fechar
-                </Button>
+                </button>
+
                 {selectedVaga.linkInscricao && (
                   <a
                     href={selectedVaga.linkInscricao.startsWith('http') ? selectedVaga.linkInscricao : `https://${selectedVaga.linkInscricao}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center justify-center font-medium text-xs px-3.5 py-2 rounded bg-slate-800 text-white hover:bg-slate-700 transition-colors w-full sm:w-auto text-center"
+                    className="inline-flex items-center gap-1 text-xs font-medium px-4 py-2 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-300 transition-colors"
                   >
-                    Página da Vaga ↗
+                    <span>Página Externa ↗</span>
                   </a>
                 )}
-                {role === 'aluno' ? (
-                  <Button
-                    variant={isVagaApplied(selectedVaga.id) ? 'secondary' : 'primary'}
-                    size="sm"
+
+                {role === 'aluno' && (
+                  <button
+                    type="button"
                     disabled={isVagaApplied(selectedVaga.id) || isApplying}
                     onClick={() => handleApply(selectedVaga)}
-                    className="w-full sm:w-auto"
+                    className={`inline-flex items-center gap-2 px-5 py-2 text-xs font-semibold rounded-lg transition-all shadow-xs cursor-pointer ${
+                      isVagaApplied(selectedVaga.id)
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-300 cursor-default'
+                        : 'bg-[#142d59] hover:bg-[#0d1e3c] text-white border border-[#142d59]'
+                    }`}
                   >
-                    {isVagaApplied(selectedVaga.id) ? 'Candidatura já enviada' : 'Candidatar-se Internamente'}
-                  </Button>
-                ) : (
-                  <span className="text-[11px] text-slate-500 font-medium px-2 py-1.5 bg-slate-100 rounded border border-slate-200 text-center">
-                    Visualização Institucional (Candidatura restrita a alunos)
-                  </span>
+                    <span>{isVagaApplied(selectedVaga.id) ? 'Candidatura Enviada' : 'Candidatar-se à Vaga'}</span>
+                    {!isVagaApplied(selectedVaga.id) && <CheckCircle2 className="w-3.5 h-3.5 text-fia-lime" />}
+                  </button>
                 )}
               </div>
             </div>

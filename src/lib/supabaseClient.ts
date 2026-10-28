@@ -1,17 +1,16 @@
-// Configuração do Supabase Client
-// TODO: Quando o banco Supabase for provisionado, instalar @supabase/supabase-js
-// e carregar VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY de variáveis de ambiente.
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-export const isSupabaseConfigured = false;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
 
-/*
-// Exemplo de integração futura:
-import { createClient } from '@supabase/supabase-js';
+export const isSupabaseConfigured: boolean = Boolean(
+  supabaseUrl &&
+  supabaseAnonKey &&
+  supabaseUrl.trim() !== '' &&
+  supabaseAnonKey.trim() !== '' &&
+  !supabaseUrl.includes('your-project-id')
+);
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-*/
-
-export const supabase = null;
+export const supabase: SupabaseClient | null = isSupabaseConfigured
+  ? createClient(supabaseUrl as string, supabaseAnonKey as string)
+  : null;

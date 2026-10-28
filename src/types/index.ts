@@ -5,6 +5,7 @@ export interface Usuario {
   nome: string;
   email: string;
   tipo: UserRole;
+  perfilCompleto?: boolean;
   criadoEm: string;
 }
 
@@ -21,11 +22,15 @@ export interface Aluno {
   usuarioId: string;
   nome: string;
   email: string;
+  idade?: number;
+  experiencia?: string;
+  graduacao?: string;
   curso?: string;
   periodo?: string;
   curriculoUrl?: string;
   curriculoNomeArquivo?: string;
   competencias: string[];
+  perfilCompleto?: boolean;
 }
 
 export type ModalidadeVaga = 'Presencial' | 'Híbrido' | 'Remoto';

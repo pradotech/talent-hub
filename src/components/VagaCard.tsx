@@ -1,18 +1,17 @@
 import React, { useState } from 'react';
 import type { Vaga, VagaRecomendada } from '../types';
-import { Card, CardBody, CardFooter } from './Card';
-import { Tag } from './Tag';
-import { Button } from './Button';
+import { Card, CardBody } from './Card';
 import { formatDate } from '../lib/utils';
 import { formatVagaForSharing, getWhatsAppShareUrl } from '../lib/shareUtils';
 import { 
   MapPin, 
   Calendar, 
   DollarSign, 
-  Building2, 
   Copy, 
   Check, 
-  Share2 
+  Share2,
+  ArrowUpRight,
+  Sparkles
 } from 'lucide-react';
 
 interface VagaCardProps {
@@ -46,12 +45,7 @@ export const VagaCard: React.FC<VagaCardProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
+      // Fallback
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -64,39 +58,48 @@ export const VagaCard: React.FC<VagaCardProps> = ({
   };
 
   return (
-    <Card className="flex flex-col h-full border-slate-200">
-      <CardBody className="flex-1 flex flex-col p-5">
-        {/* Header do Card: Empresa e Status */}
-        <div className="flex items-start justify-between gap-2.5 sm:gap-4 mb-3">
-          <div className="space-y-1 min-w-0">
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#142d59] uppercase tracking-wider bg-[#eef3fa] border border-[#d0dff2] px-2.5 py-0.5 rounded-md truncate max-w-full">
-              <Building2 className="w-3.5 h-3.5 text-[#142d59] shrink-0" />
-              <span className="truncate">{vaga.empresa}</span>
-            </span>
-            <h3 className="text-base font-bold tracking-tight text-slate-900 leading-snug hover:text-fia-deep transition-colors pt-1">
-              {vaga.titulo}
-            </h3>
+    <Card className="flex flex-col h-full bg-white border border-slate-200/90 rounded-2xl hover:border-[#142d59]/30 hover:shadow-lg transition-all duration-200 group text-left overflow-hidden">
+      <CardBody className="flex-1 flex flex-col p-5 sm:p-6">
+        {/* Cabeçalho do Card */}
+        <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <div className="w-10 h-10 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center font-bold text-slate-700 text-sm shrink-0 group-hover:bg-[#142d59]/10 group-hover:text-[#142d59] group-hover:border-[#142d59]/20 transition-all">
+              {vaga.empresa ? vaga.empresa.charAt(0).toUpperCase() : 'V'}
+            </div>
+            <div className="min-w-0 flex-1">
+              <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider block truncate">
+                {vaga.empresa}
+              </span>
+              <h3 
+                onClick={() => onViewDetails && onViewDetails(vaga)}
+                className="text-base font-bold text-slate-900 group-hover:text-[#142d59] transition-colors leading-snug cursor-pointer truncate capitalize"
+                title={vaga.titulo}
+              >
+                {vaga.titulo}
+              </h3>
+            </div>
           </div>
 
-          {/* Badge de recomendação / aderência com cores FIA */}
-          {recomendada && (
+          {/* Badge de Aderência ou Status */}
+          {recomendada && typeof recomendada.aderenciaPorcentagem === 'number' && (
             <div
-              className={`shrink-0 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-semibold border ${
+              className={`shrink-0 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border transition-colors ${
                 recomendada.aderenciaPorcentagem >= 70
-                  ? 'bg-[#e9f2dc] text-[#084734] border-[#abbd88] font-bold shadow-2xs'
+                  ? 'bg-[#084734]/10 text-[#084734] border-[#084734]/25'
                   : recomendada.aderenciaPorcentagem >= 40
-                  ? 'bg-slate-100 text-slate-800 border-slate-300'
+                  ? 'bg-slate-100 text-slate-700 border-slate-200'
                   : 'bg-slate-50 text-slate-500 border-slate-200'
               }`}
-              title="Aderência de competências calculada pelo perfil"
+              title="Aderência de competências calculada pelo perfil do aluno"
             >
-              {recomendada.aderenciaPorcentagem}% aderência
+              <Sparkles className="w-3 h-3" />
+              <span>{recomendada.aderenciaPorcentagem}% Match</span>
             </div>
           )}
 
           {showAdminView && (
             <span
-              className={`shrink-0 text-[10px] sm:text-[11px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded border ${
+              className={`shrink-0 text-[10px] uppercase tracking-wider font-semibold px-2 py-0.5 rounded-md border ${
                 vaga.status === 'aberta'
                   ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                   : 'bg-slate-100 text-slate-600 border-slate-200'
@@ -108,145 +111,136 @@ export const VagaCard: React.FC<VagaCardProps> = ({
         </div>
 
         {/* Descrição resumida */}
-        <p className="text-xs text-slate-600 line-clamp-3 mb-4 leading-relaxed">
+        <p className="text-xs text-slate-600 line-clamp-2 mb-4 leading-relaxed">
           {vaga.descricao}
         </p>
 
-        {/* Metadados: Modalidade, Remuneração e Prazo */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-1.5 gap-x-2 text-[11px] text-slate-500 mb-4 pt-2 border-t border-slate-100">
-          <div className="flex items-center gap-1.5 truncate">
-            <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-            <span className="truncate">{vaga.modalidade}</span>
-          </div>
-
-          {vaga.remuneracao ? (
-            <div className="flex items-center gap-1.5 truncate">
-              <DollarSign className="w-3 h-3 text-slate-400 shrink-0" />
-              <span className="truncate">{vaga.remuneracao}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 truncate text-slate-400">
-              <span>A combinar</span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-1.5 truncate sm:col-span-2">
-            <Calendar className="w-3 h-3 text-slate-400 shrink-0" />
-            <span className="truncate">Inscrições até: {formatDate(vaga.dataLimite)}</span>
-          </div>
+        {/* Chips de Metadados: Modalidade, Bolsa e Prazo */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-slate-500 mb-4 pt-3 border-t border-slate-100">
+          <span className="flex items-center gap-1 font-medium text-slate-700">
+            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+            {vaga.modalidade}
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1 font-medium text-slate-700">
+            <DollarSign className="w-3.5 h-3.5 text-slate-400" />
+            {vaga.remuneracao ? vaga.remuneracao : 'A combinar'}
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1 text-slate-500">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            Até {formatDate(vaga.dataLimite)}
+          </span>
         </div>
 
-        {/* Competências / Skills Tags */}
+        {/* Competências Requeridas (Tags) */}
         <div className="mt-auto pt-3 border-t border-slate-100">
-          <p className="text-[10px] uppercase tracking-wider font-medium text-slate-400 mb-2">
-            Requisitos de Competências:
-          </p>
           <div className="flex flex-wrap gap-1.5">
-            {vaga.competenciasNecessarias.map((skill) => {
+            {vaga.competenciasNecessarias.slice(0, 4).map((skill) => {
               const isMatched =
                 recomendada &&
+                recomendada.competenciasEmComum &&
                 recomendada.competenciasEmComum.some(
                   (c) => c.toLowerCase() === skill.toLowerCase()
                 );
 
               return (
-                <Tag
+                <span
                   key={skill}
-                  label={skill}
-                  variant={isMatched ? 'matched' : 'default'}
-                  size="sm"
-                />
+                  className={`text-[11px] px-2.5 py-1 rounded-md border font-medium ${
+                    isMatched
+                      ? 'bg-[#084734]/10 text-[#084734] border-[#084734]/25 font-semibold'
+                      : 'bg-slate-50 text-slate-600 border-slate-200'
+                  }`}
+                >
+                  {skill}
+                </span>
               );
             })}
+            {vaga.competenciasNecessarias.length > 4 && (
+              <span className="text-[11px] text-slate-400 self-center pl-1 font-medium">
+                +{vaga.competenciasNecessarias.length - 4}
+              </span>
+            )}
           </div>
         </div>
       </CardBody>
 
-      {/* Footer com Compartilhamento e Ações */}
-      <CardFooter className="flex flex-col gap-2.5 bg-slate-50/80 p-3">
-        {/* Barra de divulgação (Copiar e WhatsApp) */}
-        <div className="flex flex-wrap items-center justify-between gap-1.5 w-full pt-0.5 text-xs text-slate-500 border-b border-slate-200/60 pb-2">
-          <span className="text-[10px] uppercase tracking-wider font-semibold text-slate-400">
-            Divulgar:
-          </span>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={handleCopyVaga}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-100 transition-colors"
-              title="Copiar dados da vaga para a área de transferência"
-            >
-              {copied ? (
-                <>
-                  <Check className="w-3 h-3 text-emerald-600" />
-                  <span className="text-emerald-700 font-semibold">Copiado!</span>
-                </>
-              ) : (
-                <>
-                  <Copy className="w-3 h-3 text-slate-500" />
-                  <span>Copiar</span>
-                </>
-              )}
-            </button>
+      {/* Rodapé Elegante com Ações e Compartilhamento */}
+      <div className="flex items-center justify-between px-5 py-3 bg-slate-50/80 border-t border-slate-100 gap-2">
+        {/* Ações de Compartilhamento à esquerda */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleCopyVaga}
+            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-white border border-transparent hover:border-slate-200 rounded-lg transition-all cursor-pointer"
+            title="Copiar dados da vaga"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
 
-            <button
-              type="button"
-              onClick={handleWhatsAppShare}
-              className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors"
-              title="Enviar dados formatados desta vaga no WhatsApp"
-            >
-              <Share2 className="w-3 h-3 text-emerald-700" />
-              <span>WhatsApp</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={handleWhatsAppShare}
+            className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 border border-transparent hover:border-emerald-200 rounded-lg transition-all cursor-pointer"
+            title="Compartilhar no WhatsApp"
+          >
+            <Share2 className="w-3.5 h-3.5" />
+          </button>
         </div>
 
-        {/* Ações principais */}
-        {showAdminView ? (
-          <div className="flex items-center gap-2 w-full justify-between">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onManageCandidates && onManageCandidates(vaga)}
-            >
-              Ver Inscritos
-            </Button>
-            {onToggleStatus && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onToggleStatus(vaga)}
-                className="text-slate-600 text-xs"
+        {/* Botões Principais à direita */}
+        <div className="flex items-center gap-2">
+          {showAdminView ? (
+            <>
+              <button
+                type="button"
+                onClick={() => onManageCandidates && onManageCandidates(vaga)}
+                className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-all shadow-2xs cursor-pointer"
               >
-                {vaga.status === 'aberta' ? 'Encerrar Vaga' : 'Reabrir Vaga'}
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 w-full justify-between">
-            {onViewDetails && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onViewDetails(vaga)}
-                className="text-slate-600 hover:text-slate-900"
-              >
-                Detalhes
-              </Button>
-            )}
-            {onApply && (
-              <Button
-                variant={isApplied ? 'secondary' : 'primary'}
-                size="sm"
-                disabled={isApplied || vaga.status === 'encerrada'}
-                onClick={() => onApply(vaga)}
-              >
-                {isApplied ? 'Inscrição Enviada' : 'Candidatar-se'}
-              </Button>
-            )}
-          </div>
-        )}
-      </CardFooter>
+                Inscritos
+              </button>
+              {onToggleStatus && (
+                <button
+                  type="button"
+                  onClick={() => onToggleStatus(vaga)}
+                  className="px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                >
+                  {vaga.status === 'aberta' ? 'Encerrar' : 'Reabrir'}
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              {onViewDetails && (
+                <button
+                  type="button"
+                  onClick={() => onViewDetails(vaga)}
+                  className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-200 rounded-lg transition-all cursor-pointer"
+                >
+                  Ver Detalhes
+                </button>
+              )}
+
+              {onApply && (
+                <button
+                  type="button"
+                  disabled={isApplied || vaga.status === 'encerrada'}
+                  onClick={() => onApply(vaga)}
+                  className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all shadow-xs cursor-pointer ${
+                    isApplied
+                      ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 cursor-default'
+                      : 'bg-[#142d59] hover:bg-[#0f2347] text-white border border-[#142d59]'
+                  }`}
+                >
+                  <span>{isApplied ? 'Inscrito' : 'Candidatar-se'}</span>
+                  {!isApplied && <ArrowUpRight className="w-3.5 h-3.5 text-fia-lime" />}
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      </div>
     </Card>
   );
 };

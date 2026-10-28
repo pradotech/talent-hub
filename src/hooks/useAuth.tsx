@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { Usuario, UserRole } from '../types';
-import { authService, FAKE_PROFILES } from '../services/authService';
+import { authService, mapSupabaseUserToUsuario, AUTH_STORAGE_KEY } from '../services/authService';
+import { supabase, isSupabaseConfigured } from '../lib/supabaseClient';
 
 interface AuthContextType {
   user: Usuario | null;
@@ -8,22 +9,69 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, senha: string) => Promise<Usuario>;
-  register: (nome: string, email: string, role: UserRole) => Promise<Usuario>;
-  logout: () => void;
-  switchRole: (role: UserRole) => void;
+  register: (nome: string, email: string, role: UserRole, senha?: string) => Promise<Usuario>;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<Usuario | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  // Inicialização síncrona imediata para evitar tela em branco
+  const [user, setUser] = useState<Usuario | null>(() => authService.getCurrentUser());
+  const [isLoading, setIsLoading] = useState<boolean>(() => !authService.getCurrentUser());
 
   useEffect(() => {
-    // Carrega usuário da sessão salva caso exista
-    const currentUser = authService.getCurrentUser();
-    setUser(currentUser);
-    setIsLoading(false);
+    let isMounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        // Timeout de segurança de 1s para nunca travar a renderização inicial
+        const timeoutPromise = new Promise<null>((resolve) =>
+          setTimeout(() => resolve(null), 1000)
+        );
+        const sessionPromise = authService.getInitialUser();
+
+        const initialUser = await Promise.race([sessionPromise, timeoutPromise]);
+
+        if (isMounted && initialUser) {
+          setUser(initialUser);
+        }
+      } catch (err) {
+        console.warn('Erro ao inicializar sessão de autenticação:', err);
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    initializeAuth();
+
+    // Sincronização em tempo real com eventos do Supabase Auth
+    if (isSupabaseConfigured && supabase) {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (_event, session) => {
+          if (!isMounted) return;
+          if (session?.user) {
+            const mappedUser = mapSupabaseUserToUsuario(session.user);
+            authService.saveSession(mappedUser);
+            setUser(mappedUser);
+          } else if (_event === 'SIGNED_OUT') {
+            localStorage.removeItem(AUTH_STORAGE_KEY);
+            setUser(null);
+          }
+        }
+      );
+
+      return () => {
+        isMounted = false;
+        subscription.unsubscribe();
+      };
+    }
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const login = async (email: string, senha: string): Promise<Usuario> => {
@@ -37,10 +85,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (nome: string, email: string, role: UserRole): Promise<Usuario> => {
+  const register = async (nome: string, email: string, role: UserRole, senha?: string): Promise<Usuario> => {
     setIsLoading(true);
     try {
-      const newUser = await authService.register(nome, email, role);
+      const newUser = await authService.register(nome, email, role, senha);
       setUser(newUser);
       return newUser;
     } finally {
@@ -48,17 +96,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = (): void => {
-    authService.logout();
+  const logout = async (): Promise<void> => {
     setUser(null);
-  };
-
-  const switchRole = (newRole: UserRole): void => {
-    const profile = FAKE_PROFILES.find((p) => p.role === newRole);
-    if (profile) {
-      authService.saveSession(profile.usuario);
-      setUser(profile.usuario);
-    }
+    setIsLoading(false);
+    await authService.logout();
   };
 
   return (
@@ -71,7 +112,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
-        switchRole,
       }}
     >
       {children}
@@ -86,4 +126,3 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
-

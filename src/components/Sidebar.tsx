@@ -10,7 +10,6 @@ import {
   UserCheck, 
   Layers,
   Building2,
-  ShieldCheck,
   GraduationCap,
   X
 } from 'lucide-react';
@@ -21,7 +20,7 @@ interface SidebarProps {
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
-  const { role, switchRole } = useAuth();
+  const { role } = useAuth();
 
   const cadastroVagaRoute = role === 'admin' ? '/admin/nova-vaga' : '/aluno/cadastrar-vaga';
 
@@ -68,34 +67,34 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
 
           <button
             onClick={onClose}
-            className="lg:hidden text-slate-400 hover:text-slate-600 p-1"
-            aria-label="Fechar menu lateral"
+            className="p-1 rounded-md text-slate-400 hover:text-slate-600 lg:hidden"
+            aria-label="Fechar menu"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* CTA Principal: Cadastrar Vaga */}
-        <div className="p-4 border-b border-slate-100">
+        {/* CTA Rápido de Cadastrar Vaga */}
+        <div className="p-3">
           <Link
             to={cadastroVagaRoute}
             onClick={onClose}
-            className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-lg bg-fia-deep text-white text-xs font-semibold hover:bg-fia-navy-800 transition-all shadow-xs border border-fia-deep group"
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs font-semibold rounded-lg bg-fia-deep hover:bg-fia-navy text-white transition-all shadow-xs"
           >
-            <PlusCircle className="w-4 h-4 text-fia-lime group-hover:scale-110 transition-transform" />
+            <PlusCircle className="w-4 h-4 text-fia-lime" />
             <span>Cadastrar Vaga</span>
           </Link>
-          <p className="text-[10px] text-slate-400 text-left mt-1.5 pl-0.5">
-            {role === 'admin' ? 'Painel de publicação central' : 'Compartilhe vagas com a comunidade'}
-          </p>
+          <span className="text-[10px] text-slate-400 mt-1 block text-center">
+            {role === 'admin' ? 'Painel de publicação central' : 'Compartilhar oportunidade'}
+          </span>
         </div>
 
-        {/* Navegação Principal */}
-        <div className="flex-1 overflow-y-auto px-3 py-4 space-y-6">
-          {/* Seção Aluno */}
+        {/* Links de Navegação conforme Papel do Usuário */}
+        <div className="flex-1 overflow-y-auto px-3 py-2 space-y-1">
+          {/* Navegação ALUNO */}
           {role === 'aluno' && (
-            <div className="space-y-1 text-left">
-              <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 block text-left">
+            <div className="space-y-1">
+              <span className="px-3 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 block text-left">
                 Oportunidades
               </span>
               <NavLink to="/aluno/recomendacoes" className={navItemClass} onClick={onClose}>
@@ -104,28 +103,27 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               </NavLink>
               <NavLink to="/aluno/vagas" className={navItemClass} onClick={onClose}>
                 <Briefcase className="w-4 h-4 shrink-0" />
-                Mural de Vagas
+                Todas as Vagas
               </NavLink>
-
-              <span className="px-3 pt-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 block text-left">
-                Minha Carreira
-              </span>
               <NavLink to="/aluno/candidaturas" className={navItemClass} onClick={onClose}>
                 <UserCheck className="w-4 h-4 shrink-0" />
                 Minhas Candidaturas
               </NavLink>
+
+              <span className="px-3 pt-4 text-[10px] font-bold uppercase tracking-wider text-slate-400 block text-left">
+                Meu Perfil
+              </span>
               <NavLink to="/aluno/curriculo" className={navItemClass} onClick={onClose}>
                 <FileText className="w-4 h-4 shrink-0" />
-                Currículo & Skills
+                Currículo & Competências
               </NavLink>
             </div>
           )}
 
-          {/* Seção Administrador */}
+          {/* Navegação ADMIN */}
           {role === 'admin' && (
-            <div className="space-y-1 text-left">
-              <span className="px-3 text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 text-left">
-                <ShieldCheck className="w-3.5 h-3.5 text-fia-deep" />
+            <div className="space-y-1">
+              <span className="px-3 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 block text-left">
                 Administração
               </span>
               <NavLink to="/admin/dashboard" end className={navItemClass} onClick={onClose}>
@@ -146,45 +144,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               </NavLink>
             </div>
           )}
-        </div>
-
-        {/* Alternador de Perfil para Simulação */}
-        <div className="p-3 border-t border-slate-100 bg-slate-50/70">
-          <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1.5 px-1 text-left">
-            Simular visão de:
-          </span>
-          <div className="grid grid-cols-2 gap-1 bg-slate-200/60 p-1 rounded-lg">
-            <button
-              type="button"
-              onClick={() => {
-                switchRole('admin');
-                onClose();
-              }}
-              className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                role === 'admin'
-                  ? 'bg-white text-fia-deep shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Admin
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                switchRole('aluno');
-                onClose();
-              }}
-              className={`flex items-center justify-center gap-1.5 py-1.5 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                role === 'aluno'
-                  ? 'bg-white text-fia-deep shadow-xs border border-slate-200'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              Aluno
-            </button>
-          </div>
         </div>
 
         {/* Footer da Sidebar com Tagline Oficial da FIA */}
