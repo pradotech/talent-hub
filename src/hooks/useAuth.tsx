@@ -50,15 +50,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Sincronização em tempo real com eventos do Supabase Auth
     if (isSupabaseConfigured && supabase) {
       const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        (_event, session) => {
+        async (_event, session) => {
           if (!isMounted) return;
           if (session?.user) {
-            const mappedUser = mapSupabaseUserToUsuario(session.user);
+            const perfil = await authService.fetchPerfilUsuario(session.user.id);
+            const mappedUser = mapSupabaseUserToUsuario(session.user, perfil?.tipo, perfil?.nome);
             authService.saveSession(mappedUser);
-            setUser(mappedUser);
+            if (isMounted) {
+              setUser(mappedUser);
+            }
           } else if (_event === 'SIGNED_OUT') {
             localStorage.removeItem(AUTH_STORAGE_KEY);
-            setUser(null);
+            if (isMounted) {
+              setUser(null);
+            }
           }
         }
       );

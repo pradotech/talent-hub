@@ -6,17 +6,14 @@ export const AUTH_STORAGE_KEY = 'fia_auth_user_v2';
 
 export function mapSupabaseUserToUsuario(user: User, perfilTipo?: UserRole, perfilNome?: string): Usuario {
   const metadata = user.user_metadata ?? {};
-  const rawRole = (
-    perfilTipo ||
-    (typeof metadata.tipo === 'string'
-      ? metadata.tipo
-      : typeof metadata.role === 'string'
-      ? metadata.role
-      : '')
-  ).toLowerCase();
+  const appMetadata = user.app_metadata ?? {};
 
-  // Padrão rigoroso: se não for expressamente 'admin', é 'aluno'
-  const tipo: UserRole = rawRole === 'admin' ? 'admin' : 'aluno';
+  // Segurança estrita: o papel de 'admin' NUNCA é aceito via user_metadata (que o usuário pode forjar no cliente).
+  // Só é concedido se confirmado pela tabela 'perfis' no Supabase ou via app_metadata seguro (JWT assinado pelo backend).
+  let tipo: UserRole = 'aluno';
+  if (perfilTipo === 'admin' || appMetadata.role === 'admin' || appMetadata.tipo === 'admin') {
+    tipo = 'admin';
+  }
 
   const nome = (
     perfilNome ||
@@ -69,37 +66,46 @@ export const authService = {
       throw new Error('Não foi possível identificar o usuário autenticado.');
     }
 
-    // Consulta perfil do usuário na tabela perfis para obter tipo e nome atualizados
-    let perfilTipo: UserRole | undefined;
-    let perfilNome: string | undefined;
-
-    try {
-      const { data: perfilData } = await supabase
-        .from('perfis')
-        .select('tipo, nome')
-        .eq('id', data.user.id)
-        .maybeSingle();
-
-      if (perfilData) {
-        perfilTipo = perfilData.tipo as UserRole;
-        perfilNome = perfilData.nome;
-      }
-    } catch {
-      // Usa fallback de metadados
-    }
-
-    const usuario = mapSupabaseUserToUsuario(data.user, perfilTipo, perfilNome);
+    // Consulta perfil do usuário na tabela perfis para obter tipo e nome atualizados com segurança
+    const perfil = await this.fetchPerfilUsuario(data.user.id);
+    const usuario = mapSupabaseUserToUsuario(data.user, perfil?.tipo, perfil?.nome);
     this.saveSession(usuario);
     return usuario;
   },
 
   /**
-   * Realiza cadastro via Supabase Auth (com tipo 'aluno' por padrão).
+   * Consulta segura do perfil diretamente no banco do Supabase.
    */
-  async register(nome: string, email: string, role: UserRole = 'aluno', senha?: string): Promise<Usuario> {
+  async fetchPerfilUsuario(userId: string): Promise<{ tipo: UserRole; nome: string } | null> {
+    if (!isSupabaseConfigured || !supabase) return null;
+    try {
+      const { data, error } = await supabase
+        .from('perfis')
+        .select('tipo, nome')
+        .eq('id', userId)
+        .maybeSingle();
+
+      if (!error && data) {
+        return {
+          tipo: data.tipo === 'admin' ? 'admin' : 'aluno',
+          nome: data.nome,
+        };
+      }
+    } catch (err) {
+      console.warn('Erro ao consultar perfil seguro no Supabase:', err);
+    }
+    return null;
+  },
+
+  /**
+   * Realiza cadastro via Supabase Auth (exclusivamente com tipo 'aluno').
+   * O autocadastro público nunca permite elevação para 'admin'.
+   */
+  async register(nome: string, email: string, _role: UserRole = 'aluno', senha?: string): Promise<Usuario> {
     const cleanEmail = email.trim().toLowerCase();
     const cleanNome = nome.trim();
-    const finalRole: UserRole = role === 'admin' ? 'admin' : 'aluno';
+    // Autocadastros são SEMPRE 'aluno'
+    const finalRole: UserRole = 'aluno';
 
     if (!isSupabaseConfigured || !supabase) {
       throw new Error('O serviço de autenticação do Supabase não está configurado.');
@@ -115,7 +121,7 @@ export const authService = {
       options: {
         data: {
           nome: cleanNome,
-          tipo: finalRole,
+          tipo: 'aluno',
         },
       },
     });
@@ -153,23 +159,8 @@ export const authService = {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
-          let perfilTipo: UserRole | undefined;
-          let perfilNome: string | undefined;
-
-          try {
-            const { data: perfilData } = await supabase
-              .from('perfis')
-              .select('tipo, nome')
-              .eq('id', session.user.id)
-              .maybeSingle();
-
-            if (perfilData) {
-              perfilTipo = perfilData.tipo as UserRole;
-              perfilNome = perfilData.nome;
-            }
-          } catch {}
-
-          const usuario = mapSupabaseUserToUsuario(session.user, perfilTipo, perfilNome);
+          const perfil = await this.fetchPerfilUsuario(session.user.id);
+          const usuario = mapSupabaseUserToUsuario(session.user, perfil?.tipo, perfil?.nome);
           this.saveSession(usuario);
           return usuario;
         }
