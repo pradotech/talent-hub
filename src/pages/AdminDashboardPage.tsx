@@ -107,6 +107,18 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
     }
   };
 
+  const handleAbrirCurriculo = async (urlOuPath?: string) => {
+    if (!urlOuPath) return;
+    try {
+      const targetUrl = await alunosService.obterUrlVisualizacaoCurriculo(urlOuPath);
+      if (targetUrl) {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      console.error('Falha ao abrir currículo do aluno:', err);
+    }
+  };
+
   const vagasAtivas = vagas.filter((v) => v.status === 'aberta').length;
   const vagasEncerradas = vagas.filter((v) => v.status === 'encerrada').length;
 
@@ -402,16 +414,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
                       {/* Status de Currículo */}
                       <div className="flex sm:flex-col items-end gap-1.5 shrink-0">
                         {alunoItem.curriculoUrl ? (
-                          <a
-                            href={alunoItem.curriculoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors"
+                          <button
+                            type="button"
+                            onClick={() => handleAbrirCurriculo(alunoItem.curriculoUrl)}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
                           >
                             <FileText className="w-3.5 h-3.5" />
                             Ver Currículo PDF
                             <ExternalLink className="w-3 h-3" />
-                          </a>
+                          </button>
                         ) : (
                           <span className="inline-flex items-center gap-1 text-xs text-slate-400 bg-slate-50 px-2.5 py-1 rounded border border-slate-200">
                             Currículo não anexado
@@ -603,16 +614,21 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
 
                           {/* Ações e Mudança de Status */}
                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200 text-xs">
-                            <a
-                              href={candidato.alunoCurriculoUrl || '#'}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-fia-accent hover:underline font-medium self-start"
-                            >
-                              <FileText className="w-3.5 h-3.5" />
-                              Ver Currículo PDF
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
+                            {candidato.alunoCurriculoUrl ? (
+                              <button
+                                type="button"
+                                onClick={() => handleAbrirCurriculo(candidato.alunoCurriculoUrl)}
+                                className="inline-flex items-center gap-1 text-fia-accent hover:underline font-medium self-start cursor-pointer"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                Ver Currículo PDF
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">
+                                Sem currículo anexado
+                              </span>
+                            )}
 
                             <div className="flex flex-wrap items-center gap-1.5">
                               <button
@@ -802,16 +818,15 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
                               {aluno.competencias?.length || 0} competência(s) no currículo
                             </span>
                             {aluno.curriculoUrl ? (
-                              <a
-                                href={aluno.curriculoUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-fia-accent hover:underline font-medium text-xs"
+                              <button
+                                type="button"
+                                onClick={() => handleAbrirCurriculo(aluno.curriculoUrl)}
+                                className="inline-flex items-center gap-1 text-fia-accent hover:underline font-medium text-xs cursor-pointer"
                               >
                                 <FileText className="w-3.5 h-3.5" />
                                 Ver Currículo PDF
                                 <ExternalLink className="w-3 h-3" />
-                              </a>
+                              </button>
                             ) : (
                               <span className="text-[11px] text-slate-400 italic">
                                 Currículo não anexado

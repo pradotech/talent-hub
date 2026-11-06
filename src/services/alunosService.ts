@@ -20,6 +20,15 @@ interface PerfilRow {
   criado_em: string;
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+    reader.readAsDataURL(file);
+  });
+}
+
 function mapPerfilToAluno(row: PerfilRow): Aluno {
   return {
     id: row.id,
@@ -227,12 +236,77 @@ export const alunosService = {
     throw new Error('Supabase não está configurado.');
   },
 
+  // Upload físico do arquivo de currículo para o Bucket PRIVADO 'curriculos'
+  async uploadArquivoCurriculo(usuarioId: string, file: File): Promise<string> {
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const cleanName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+        const filePath = `${usuarioId}/${Date.now()}-${cleanName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('curriculos')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: true,
+          });
+
+        if (!uploadError) {
+          // Armazena o caminho relativo dentro do bucket privado
+          return filePath;
+        } else {
+          console.warn('Erro ao subir para bucket privado no Supabase:', uploadError.message);
+        }
+      } catch (err) {
+        console.warn('Falha de conexão com Supabase Storage:', err);
+      }
+    }
+
+    // Fallback: Armazenamento local persistente em Base64
+    try {
+      return await fileToBase64(file);
+    } catch {
+      return URL.createObjectURL(file);
+    }
+  },
+
+  // Gera uma URL temporária assinada pelo Supabase para acesso ao arquivo em bucket privado
+  async obterUrlVisualizacaoCurriculo(pathOuUrl?: string): Promise<string> {
+    if (!pathOuUrl) return '';
+
+    // Se já for Base64 (data:) ou Blob local válido
+    if (pathOuUrl.startsWith('data:') || pathOuUrl.startsWith('blob:')) {
+      return pathOuUrl;
+    }
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        let cleanPath = pathOuUrl;
+        if (cleanPath.includes('/curriculos/')) {
+          cleanPath = cleanPath.split('/curriculos/')[1];
+          cleanPath = cleanPath.split('?')[0];
+        }
+
+        const { data, error } = await supabase.storage
+          .from('curriculos')
+          .createSignedUrl(cleanPath, 3600); // Token de acesso válido por 1 hora
+
+        if (!error && data?.signedUrl) {
+          return data.signedUrl;
+        }
+      } catch (err) {
+        console.warn('Erro ao gerar URL assinada para visualização:', err);
+      }
+    }
+
+    return pathOuUrl;
+  },
+
   // Upload de currículo em PDF ou Word com extração automática
   async uploadCurriculo(
     usuarioId: string,
     file: File
   ): Promise<{ curriculoUrl: string; competenciasExtraidas: string[]; alunoAtualizado: Aluno }> {
-    const fakeUrl = URL.createObjectURL(file);
+    const curriculoUrl = await this.uploadArquivoCurriculo(usuarioId, file);
     const parsed = await curriculoParserService.parseCurriculo(file);
 
     const alunoAtual = await this.getAlunoByUsuarioId(usuarioId);
@@ -240,7 +314,7 @@ export const alunosService = {
     const mergedSkills = Array.from(new Set([...existingSkills, ...parsed.competencias]));
 
     const updatedAluno = await this.updateAlunoPerfil(usuarioId, {
-      curriculoUrl: fakeUrl,
+      curriculoUrl,
       curriculoNomeArquivo: file.name,
       competencias: mergedSkills,
       graduacao: parsed.graduacao || alunoAtual?.graduacao,
@@ -248,7 +322,7 @@ export const alunosService = {
     });
 
     return {
-      curriculoUrl: fakeUrl,
+      curriculoUrl,
       competenciasExtraidas: parsed.competencias,
       alunoAtualizado: updatedAluno,
     };

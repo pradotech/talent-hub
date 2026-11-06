@@ -123,6 +123,18 @@ export const AlunoCurriculoPage: React.FC = () => {
     }
   };
 
+  const handleVisualizarCurriculo = async () => {
+    if (!aluno?.curriculoUrl) return;
+    try {
+      const signedUrl = await alunosService.obterUrlVisualizacaoCurriculo(aluno.curriculoUrl);
+      if (signedUrl) {
+        window.open(signedUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch (err) {
+      console.error('Falha ao abrir currículo do aluno:', err);
+    }
+  };
+
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -349,15 +361,14 @@ export const AlunoCurriculoPage: React.FC = () => {
 
                   <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                     {aluno.curriculoUrl && (
-                      <a
-                        href={aluno.curriculoUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors"
+                      <button
+                        type="button"
+                        onClick={handleVisualizarCurriculo}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors cursor-pointer"
                       >
                         <span>Visualizar</span>
                         <ExternalLink className="w-3 h-3 text-slate-400" />
-                      </a>
+                      </button>
                     )}
 
                     <label className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#142d59] bg-[#eef3fa] hover:bg-[#dce9f8] border border-[#c6dcf5] rounded-lg transition-colors cursor-pointer">

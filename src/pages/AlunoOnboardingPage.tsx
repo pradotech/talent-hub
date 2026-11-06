@@ -164,7 +164,7 @@ export const AlunoOnboardingPage: React.FC = () => {
     try {
       let fileUrl = '';
       if (selectedFile) {
-        fileUrl = URL.createObjectURL(selectedFile);
+        fileUrl = await alunosService.uploadArquivoCurriculo(usuarioId, selectedFile);
       }
 
       const graduacaoFinal = segundaGraduacao.trim()
