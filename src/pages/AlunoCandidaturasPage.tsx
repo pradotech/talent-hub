@@ -8,7 +8,7 @@ import { Card, CardBody } from '../components/Card';
 import { Tag } from '../components/Tag';
 import { Button } from '../components/Button';
 import { formatDate } from '../lib/utils';
-import { UserCheck, Clock, CheckCircle, XCircle, ArrowRight } from 'lucide-react';
+import { UserCheck, Clock, CheckCircle, XCircle, ArrowRight, FileText, ExternalLink } from 'lucide-react';
 
 export const AlunoCandidaturasPage: React.FC = () => {
   const { user, role } = useAuth();
@@ -122,6 +122,23 @@ export const AlunoCandidaturasPage: React.FC = () => {
                     </h3>
                     <div className="flex items-center gap-3 text-xs text-slate-500 mt-1">
                       <span>Enviada em {formatDate(candidatura.criadaEm)}</span>
+                      {candidatura.alunoCurriculoUrl && (
+                        <>
+                          <span>•</span>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              const url = await alunosService.obterUrlVisualizacaoCurriculo(candidatura.alunoCurriculoUrl);
+                              if (url) window.open(url, '_blank', 'noopener,noreferrer');
+                            }}
+                            className="inline-flex items-center gap-1 text-[11px] text-fia-accent hover:underline font-medium cursor-pointer"
+                          >
+                            <FileText className="w-3 h-3" />
+                            <span>Ver currículo anexado</span>
+                            <ExternalLink className="w-2.5 h-2.5" />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </div>
 
