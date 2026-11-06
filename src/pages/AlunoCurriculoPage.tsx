@@ -12,6 +12,7 @@ import {
   FileText, 
   Sparkles, 
   CheckCircle, 
+  CheckCircle2,
   Plus, 
   Info,
   ExternalLink,
@@ -19,7 +20,9 @@ import {
   User,
   Calendar,
   Mail,
-  Edit3
+  Edit3,
+  Loader2,
+  X
 } from 'lucide-react';
 
 export const AlunoCurriculoPage: React.FC = () => {
@@ -35,6 +38,13 @@ export const AlunoCurriculoPage: React.FC = () => {
   const [isUploading, setIsUploading] = useState<boolean>(false);
   const [newSkillInput, setNewSkillInput] = useState<string>('');
   const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+
+  interface ToastNotification {
+    title: string;
+    message: string;
+    type?: 'success' | 'error';
+  }
+  const [toast, setToast] = useState<ToastNotification | null>(null);
 
   // Modal de edição de dados pessoais
   const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
@@ -141,18 +151,37 @@ export const AlunoCurriculoPage: React.FC = () => {
 
     setIsUploading(true);
     setFeedbackMessage(null);
+    setToast(null);
+
     try {
       const result = await alunosService.uploadCurriculo(usuarioId, file);
       setAluno(result.alunoAtualizado);
-      setFeedbackMessage(
-        `Currículo processado! ${result.competenciasExtraidas.length} competências foram extraídas e sincronizadas.`
-      );
-      setTimeout(() => setFeedbackMessage(null), 5000);
+
+      const msg = `${result.competenciasExtraidas.length} competências extraídas e perfil acadêmico sincronizado.`;
+      setFeedbackMessage(`Currículo atualizado! ${msg}`);
+
+      // Exibe toast flutuante com confirmação visual destacada
+      setToast({
+        title: 'Currículo Atualizado com Sucesso!',
+        message: `O arquivo "${file.name}" foi salvo e ${result.competenciasExtraidas.length} competências foram mapeadas para o cálculo de aderência com as vagas.`,
+        type: 'success',
+      });
+
+      setTimeout(() => setToast(null), 6000);
+      setTimeout(() => setFeedbackMessage(null), 6000);
     } catch (err) {
       console.warn('Erro ao processar currículo:', err);
-      setFeedbackMessage('Falha ao processar o arquivo. Tente novamente.');
+      const errMsg = 'Falha ao processar o arquivo. Tente novamente.';
+      setFeedbackMessage(errMsg);
+      setToast({
+        title: 'Erro ao atualizar currículo',
+        message: err instanceof Error ? err.message : errMsg,
+        type: 'error',
+      });
+      setTimeout(() => setToast(null), 6000);
     } finally {
       setIsUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -343,6 +372,18 @@ export const AlunoCurriculoPage: React.FC = () => {
             </CardHeader>
 
             <CardBody className="p-5 sm:p-6 space-y-4">
+              {isUploading && (
+                <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-3 text-xs text-blue-900 animate-pulse">
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-700 shrink-0" />
+                  <div>
+                    <span className="font-bold block">Atualizando currículo...</span>
+                    <span className="text-[11px] text-blue-700">
+                      Salvando arquivo no bucket e extraindo novas competências em tempo real.
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {aluno?.curriculoNomeArquivo ? (
                 <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                   <div className="flex items-center gap-3 min-w-0">
@@ -364,15 +405,29 @@ export const AlunoCurriculoPage: React.FC = () => {
                       <button
                         type="button"
                         onClick={handleVisualizarCurriculo}
-                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors cursor-pointer"
+                        disabled={isUploading}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
                       >
                         <span>Visualizar</span>
                         <ExternalLink className="w-3 h-3 text-slate-400" />
                       </button>
                     )}
 
-                    <label className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-semibold text-[#142d59] bg-[#eef3fa] hover:bg-[#dce9f8] border border-[#c6dcf5] rounded-lg transition-colors cursor-pointer">
-                      <span>Substituir</span>
+                    <label
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg transition-colors ${
+                        isUploading
+                          ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed'
+                          : 'text-[#142d59] bg-[#eef3fa] hover:bg-[#dce9f8] border border-[#c6dcf5] cursor-pointer'
+                      }`}
+                    >
+                      {isUploading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 animate-spin text-[#142d59]" />
+                          <span>Processando...</span>
+                        </>
+                      ) : (
+                        <span>Substituir</span>
+                      )}
                       <input
                         type="file"
                         accept=".pdf,.docx,.doc"
@@ -584,6 +639,37 @@ export const AlunoCurriculoPage: React.FC = () => {
           </div>
         </form>
       </Modal>
+
+      {/* Toast Flutuante de Confirmação e Loading */}
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 max-w-sm sm:max-w-md bg-white border border-slate-200/90 shadow-2xl rounded-2xl p-4 flex items-start gap-3 animate-fade-in text-left">
+          <div
+            className={`p-2 rounded-xl shrink-0 ${
+              toast.type === 'error'
+                ? 'bg-red-50 text-red-700'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+            }`}
+          >
+            {toast.type === 'error' ? (
+              <X className="w-5 h-5" />
+            ) : (
+              <CheckCircle2 className="w-5 h-5" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0 pr-1">
+            <h4 className="text-xs font-bold text-slate-900">{toast.title}</h4>
+            <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">{toast.message}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="text-slate-400 hover:text-slate-600 p-1 rounded-lg transition-colors cursor-pointer"
+            aria-label="Fechar notificação"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

@@ -306,29 +306,47 @@ export const alunosService = {
     return pathOuUrl;
   },
 
-  // Upload de currículo em PDF ou Word com extração automática
+  // Upload de currículo em PDF ou Word com extração automática e atualização dos dados do perfil
   async uploadCurriculo(
     usuarioId: string,
     file: File
   ): Promise<{ curriculoUrl: string; competenciasExtraidas: string[]; alunoAtualizado: Aluno }> {
+    // 1. Upload físico do arquivo para o bucket privado no Supabase
     const curriculoUrl = await this.uploadArquivoCurriculo(usuarioId, file);
+
+    // 2. Extração inteligente de dados do arquivo PDF/DOCX
     const parsed = await curriculoParserService.parseCurriculo(file);
 
     const alunoAtual = await this.getAlunoByUsuarioId(usuarioId);
-    const existingSkills = alunoAtual?.competencias || [];
-    const mergedSkills = Array.from(new Set([...existingSkills, ...parsed.competencias]));
 
-    const updatedAluno = await this.updateAlunoPerfil(usuarioId, {
+    // Substitui pelas novas competências extraídas do PDF atualizado
+    const novasCompetencias =
+      parsed.competencias && parsed.competencias.length > 0
+        ? parsed.competencias
+        : alunoAtual?.competencias || [];
+
+    const graduacaoFinal =
+      parsed.graduacoes && parsed.graduacoes.length > 1
+        ? parsed.graduacoes.join(' • ')
+        : parsed.graduacao || alunoAtual?.graduacao;
+
+    const payloadAtualizacao: Partial<Aluno> = {
       curriculoUrl,
       curriculoNomeArquivo: file.name,
-      competencias: mergedSkills,
-      graduacao: parsed.graduacao || alunoAtual?.graduacao,
+      competencias: novasCompetencias,
+      graduacao: graduacaoFinal,
+      curso: graduacaoFinal,
       experiencia: parsed.experiencia || alunoAtual?.experiencia,
-    });
+      idade: parsed.idade || alunoAtual?.idade,
+      perfilCompleto: true,
+    };
+
+    // 3. Atualiza o perfil do aluno no banco de dados
+    const updatedAluno = await this.updateAlunoPerfil(usuarioId, payloadAtualizacao);
 
     return {
       curriculoUrl,
-      competenciasExtraidas: parsed.competencias,
+      competenciasExtraidas: novasCompetencias,
       alunoAtualizado: updatedAluno,
     };
   },
