@@ -1,5 +1,6 @@
 import type { Candidatura, StatusCandidatura, Aluno, Vaga } from '../types';
 import { calculateAdherence } from '../lib/utils';
+import { vagasService } from './vagasService';
 
 const STORAGE_KEY = 'fia_candidaturas';
 
@@ -22,6 +23,28 @@ export const candidaturasService = {
   async getCandidaturasByAluno(alunoId: string): Promise<Candidatura[]> {
     await new Promise((res) => setTimeout(res, 150));
     const list = getStoredCandidaturas();
+    let hasChanges = false;
+
+    for (const c of list) {
+      if (c.alunoId === alunoId && c.vagaId) {
+        const vaga = await vagasService.getVagaById(c.vagaId);
+        if (vaga && vaga.competenciasNecessarias && c.alunoCompetencias) {
+          const { aderenciaPorcentagem } = calculateAdherence(
+            c.alunoCompetencias,
+            vaga.competenciasNecessarias
+          );
+          if (c.compatibilidadeScore !== aderenciaPorcentagem) {
+            c.compatibilidadeScore = aderenciaPorcentagem;
+            hasChanges = true;
+          }
+        }
+      }
+    }
+
+    if (hasChanges) {
+      saveStoredCandidaturas(list);
+    }
+
     return list.filter((c) => c.alunoId === alunoId);
   },
 
@@ -29,6 +52,28 @@ export const candidaturasService = {
   async getCandidaturasByVaga(vagaId: string): Promise<Candidatura[]> {
     await new Promise((res) => setTimeout(res, 150));
     const list = getStoredCandidaturas();
+    const vaga = await vagasService.getVagaById(vagaId);
+    let hasChanges = false;
+
+    if (vaga && vaga.competenciasNecessarias) {
+      for (const c of list) {
+        if (c.vagaId === vagaId && c.alunoCompetencias) {
+          const { aderenciaPorcentagem } = calculateAdherence(
+            c.alunoCompetencias,
+            vaga.competenciasNecessarias
+          );
+          if (c.compatibilidadeScore !== aderenciaPorcentagem) {
+            c.compatibilidadeScore = aderenciaPorcentagem;
+            hasChanges = true;
+          }
+        }
+      }
+    }
+
+    if (hasChanges) {
+      saveStoredCandidaturas(list);
+    }
+
     return list.filter((c) => c.vagaId === vagaId);
   },
 
@@ -44,8 +89,8 @@ export const candidaturasService = {
     }
 
     const { aderenciaPorcentagem } = calculateAdherence(
-      vaga.competenciasNecessarias,
-      aluno.competencias
+      aluno.competencias,
+      vaga.competenciasNecessarias
     );
 
     const novaCandidatura: Candidatura = {
