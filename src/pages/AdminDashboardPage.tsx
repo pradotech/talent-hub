@@ -9,7 +9,7 @@ import { Button } from '../components/Button';
 import { Modal } from '../components/Modal';
 import { Tag } from '../components/Tag';
 import { Card, CardBody } from '../components/Card';
-import { formatDate } from '../lib/utils';
+import { formatDate, calculateAdherence } from '../lib/utils';
 import { 
   PlusCircle, 
   Layers, 
@@ -19,7 +19,9 @@ import {
   ExternalLink,
   ShieldCheck, 
   GraduationCap,
-  Search
+  Search,
+  Sparkles,
+  Filter
 } from 'lucide-react';
 
 interface AdminDashboardPageProps {
@@ -47,10 +49,13 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
     }
   };
 
-  // Estado do Modal de Candidatos da Vaga
+  // Estado do Modal de Gestão da Vaga & Match de Alunos
   const [selectedVaga, setSelectedVaga] = useState<Vaga | null>(null);
   const [candidatos, setCandidatos] = useState<Candidatura[]>([]);
   const [isLoadingCandidatos, setIsLoadingCandidatos] = useState<boolean>(false);
+  const [modalTab, setModalTab] = useState<'inscritos' | 'match'>('inscritos');
+  const [searchAlunoMatch, setSearchAlunoMatch] = useState<string>('');
+  const [filtroMinMatch, setFiltroMinMatch] = useState<number>(0);
 
   const carregarDados = async () => {
     setIsLoading(true);
@@ -77,8 +82,11 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
     setVagas(updated);
   };
 
-  const handleOpenCandidatosModal = async (vaga: Vaga) => {
+  const handleOpenCandidatosModal = async (vaga: Vaga, tab: 'inscritos' | 'match' = 'inscritos') => {
     setSelectedVaga(vaga);
+    setModalTab(tab);
+    setSearchAlunoMatch('');
+    setFiltroMinMatch(0);
     setIsLoadingCandidatos(true);
     try {
       const data = await candidaturasService.getCandidaturasByVaga(vaga.id);
@@ -110,6 +118,49 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
     const matchSkill = aluno.competencias?.some((c) => c.toLowerCase().includes(term));
     return matchNome || matchEmail || matchCurso || matchSkill;
   });
+
+  // Alunos ordenados por afinidade de competências com a vaga selecionada no modal
+  const alunosComMatch = React.useMemo(() => {
+    if (!selectedVaga) return [];
+    const vagaSkills = selectedVaga.competenciasNecessarias || [];
+
+    return alunos
+      .map((aluno) => {
+        const { aderenciaPorcentagem, competenciasEmComum, competenciasFaltantes } =
+          calculateAdherence(aluno.competencias || [], vagaSkills);
+
+        const candidaturaExistente = candidatos.find(
+          (c) =>
+            c.alunoId === aluno.id ||
+            c.alunoEmail.toLowerCase().trim() === aluno.email.toLowerCase().trim()
+        );
+
+        return {
+          aluno,
+          aderenciaPorcentagem,
+          competenciasEmComum,
+          competenciasFaltantes,
+          jaInscrito: Boolean(candidaturaExistente),
+          statusCandidatura: candidaturaExistente?.status,
+        };
+      })
+      .sort((a, b) => b.aderenciaPorcentagem - a.aderenciaPorcentagem);
+  }, [selectedVaga, alunos, candidatos]);
+
+  const alunosMatchFiltrados = React.useMemo(() => {
+    return alunosComMatch.filter((item) => {
+      if (item.aderenciaPorcentagem < filtroMinMatch) return false;
+      if (!searchAlunoMatch.trim()) return true;
+
+      const term = searchAlunoMatch.toLowerCase().trim();
+      const matchNome = item.aluno.nome?.toLowerCase().includes(term);
+      const matchEmail = item.aluno.email?.toLowerCase().includes(term);
+      const matchCurso = item.aluno.curso?.toLowerCase().includes(term);
+      const matchComp = (item.aluno.competencias || []).some((c) => c.toLowerCase().includes(term));
+
+      return matchNome || matchEmail || matchCurso || matchComp;
+    });
+  }, [alunosComMatch, searchAlunoMatch, filtroMinMatch]);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
@@ -285,6 +336,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
                   key={vaga.id}
                   vaga={vaga}
                   showAdminView={true}
+                  onViewDetails={handleOpenCandidatosModal}
                   onManageCandidates={handleOpenCandidatosModal}
                   onToggleStatus={handleToggleStatus}
                 />
@@ -396,114 +448,352 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
         </div>
       )}
 
-      {/* Modal de Gestão de Candidatos da Vaga */}
+      {/* Modal de Gestão da Vaga & Match de Alunos */}
       <Modal
         isOpen={!!selectedVaga}
         onClose={() => setSelectedVaga(null)}
-        title={selectedVaga ? `Inscritos: ${selectedVaga.titulo}` : 'Inscritos'}
-        subtitle={selectedVaga?.empresa}
-        maxWidth="2xl"
+        title={selectedVaga ? `Gestão da Vaga: ${selectedVaga.titulo}` : 'Gestão da Vaga'}
+        subtitle={
+          selectedVaga
+            ? `${selectedVaga.empresa} • ${selectedVaga.modalidade} • ${
+                selectedVaga.status === 'aberta' ? 'Vaga Ativa' : 'Encerrada'
+              }`
+            : undefined
+        }
+        maxWidth="3xl"
       >
-        {isLoadingCandidatos ? (
-          <div className="py-8 text-center text-xs text-slate-500">
-            Carregando inscrições...
-          </div>
-        ) : candidatos.length === 0 ? (
-          <div className="py-8 text-center text-slate-500 space-y-2">
-            <Users className="w-8 h-8 text-slate-400 mx-auto" />
-            <p className="text-xs">Nenhum aluno se candidatou a esta vaga até o momento.</p>
-          </div>
-        ) : (
+        {selectedVaga && (
           <div className="space-y-4">
-            {candidatos.map((candidato) => (
-              <div
-                key={candidato.id}
-                className="p-3.5 sm:p-4 border border-slate-200 rounded bg-slate-50/50 space-y-3"
+            {/* Box com Requisitos de Competências da Vaga */}
+            <div className="p-3 bg-slate-50 border border-slate-200/90 rounded-xl space-y-1.5">
+              <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider block">
+                Competências Requeridas ({selectedVaga.competenciasNecessarias?.length || 0}):
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {selectedVaga.competenciasNecessarias && selectedVaga.competenciasNecessarias.length > 0 ? (
+                  selectedVaga.competenciasNecessarias.map((comp) => (
+                    <span
+                      key={comp}
+                      className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-medium bg-white text-slate-800 border border-slate-300 shadow-2xs"
+                    >
+                      {comp}
+                    </span>
+                  ))
+                ) : (
+                  <span className="text-[11px] text-slate-400 italic">
+                    Nenhuma competência vinculada a esta vaga.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Abas de Navegação do Modal: Inscritos vs Match de Alunos */}
+            <div className="flex border-b border-slate-200 gap-2 sm:gap-4">
+              <button
+                type="button"
+                onClick={() => setModalTab('inscritos')}
+                className={`pb-2.5 px-1 sm:px-2 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                  modalTab === 'inscritos'
+                    ? 'border-fia-deep text-fia-deep'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
-                  <div>
-                    <h4 className="text-sm font-semibold text-slate-900">
-                      {candidato.alunoNome}
-                    </h4>
-                    <p className="text-xs text-slate-500">{candidato.alunoEmail}</p>
-                    <span className="text-[11px] text-slate-400">
-                      Inscrito em: {formatDate(candidato.criadaEm)}
-                    </span>
-                  </div>
+                <Users className="w-4 h-4" />
+                Inscritos ({candidatos.length})
+              </button>
 
-                  <div className="flex sm:flex-col items-start sm:items-end gap-1.5 sm:gap-1">
-                    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-900 text-white">
-                      {candidato.compatibilidadeScore ?? 0}% de Aderência
-                    </span>
-                    <span className="text-[10px] uppercase font-bold text-slate-500">
-                      Status: {candidato.status}
-                    </span>
-                  </div>
-                </div>
+              <button
+                type="button"
+                onClick={() => setModalTab('match')}
+                className={`pb-2.5 px-1 sm:px-2 text-xs font-semibold border-b-2 transition-all cursor-pointer flex items-center gap-1.5 ${
+                  modalTab === 'match'
+                    ? 'border-fia-deep text-fia-deep'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <Sparkles className="w-4 h-4 text-emerald-600" />
+                Match de Alunos FIA ({alunosComMatch.length})
+              </button>
+            </div>
 
-                {/* Competências do Aluno */}
-                <div>
-                  <p className="text-[10px] uppercase font-semibold text-slate-400 mb-1">
-                    Competências do Aluno:
-                  </p>
-                  <div className="flex flex-wrap gap-1">
-                    {candidato.alunoCompetencias.map((comp) => (
-                      <Tag key={comp} label={comp} size="sm" variant="matched" />
+            {/* Aba 1: Candidatos que se inscreveram */}
+            {modalTab === 'inscritos' && (
+              <>
+                {isLoadingCandidatos ? (
+                  <div className="py-8 text-center text-xs text-slate-500">
+                    Carregando inscrições...
+                  </div>
+                ) : candidatos.length === 0 ? (
+                  <div className="py-8 text-center text-slate-500 space-y-2">
+                    <Users className="w-8 h-8 text-slate-400 mx-auto" />
+                    <p className="text-xs">Nenhum aluno se candidatou a esta vaga até o momento.</p>
+                    <p className="text-[11px] text-slate-400">
+                      Você pode consultar a aba <strong>Match de Alunos FIA</strong> acima para ver quais alunos mais combinam com os requisitos.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                    {candidatos.map((candidato) => (
+                      <div
+                        key={candidato.id}
+                        className="p-3.5 sm:p-4 border border-slate-200 rounded-xl bg-slate-50/50 space-y-3"
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2.5">
+                          <div>
+                            <h4 className="text-sm font-semibold text-slate-900">
+                              {candidato.alunoNome}
+                            </h4>
+                            <p className="text-xs text-slate-500">{candidato.alunoEmail}</p>
+                            <span className="text-[11px] text-slate-400">
+                              Inscrito em: {formatDate(candidato.criadaEm)}
+                            </span>
+                          </div>
+
+                          <div className="flex sm:flex-col items-start sm:items-end gap-1.5 sm:gap-1">
+                            <span className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-900 text-white">
+                              {candidato.compatibilidadeScore ?? 0}% de Aderência
+                            </span>
+                            <span className="text-[10px] uppercase font-bold text-slate-500">
+                              Status: {candidato.status}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Competências do Aluno */}
+                        <div>
+                          <p className="text-[10px] uppercase font-semibold text-slate-400 mb-1">
+                            Competências do Aluno:
+                          </p>
+                          <div className="flex flex-wrap gap-1">
+                            {candidato.alunoCompetencias.map((comp) => (
+                              <Tag key={comp} label={comp} size="sm" variant="matched" />
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Ações e Mudança de Status */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200 text-xs">
+                          <a
+                            href={candidato.alunoCurriculoUrl || '#'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-1 text-fia-accent hover:underline font-medium self-start"
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            Ver Currículo PDF
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStatusCandidatura(candidato.id, 'em_analise')}
+                              className={`px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors ${
+                                candidato.status === 'em_analise'
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              Em Análise
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStatusCandidatura(candidato.id, 'aprovado')}
+                              className={`px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors ${
+                                candidato.status === 'aprovado'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              Aprovar
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStatusCandidatura(candidato.id, 'rejeitado')}
+                              className={`px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors ${
+                                candidato.status === 'rejeitado'
+                                  ? 'bg-red-100 text-red-800'
+                                  : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
+                              }`}
+                            >
+                              Rejeitar
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     ))}
                   </div>
-                </div>
+                )}
+              </>
+            )}
 
-                {/* Ações e Mudança de Status */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2.5 border-t border-slate-200 text-xs">
-                  <a
-                    href={candidato.alunoCurriculoUrl || '#'}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1 text-fia-accent hover:underline font-medium self-start"
-                  >
-                    <FileText className="w-3.5 h-3.5" />
-                    Ver Currículo PDF
-                    <ExternalLink className="w-3 h-3" />
-                  </a>
+            {/* Aba 2: Match de Alunos (Recomendados do Banco FIA) */}
+            {modalTab === 'match' && (
+              <div className="space-y-3">
+                {/* Barra de Filtros e Busca no Match */}
+                <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex flex-col sm:flex-row gap-2 items-center justify-between">
+                  <div className="relative flex-1 w-full">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
+                    <input
+                      type="text"
+                      value={searchAlunoMatch}
+                      onChange={(e) => setSearchAlunoMatch(e.target.value)}
+                      placeholder="Filtrar aluno por nome, curso ou competência..."
+                      className="w-full text-xs pl-8 pr-2.5 py-1.5 bg-white border border-slate-300 rounded-lg focus:ring-1 focus:ring-fia-deep focus:border-fia-deep outline-none"
+                    />
+                  </div>
 
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatusCandidatura(candidato.id, 'em_analise')}
-                      className={`px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors ${
-                        candidato.status === 'em_analise'
-                          ? 'bg-amber-100 text-amber-800'
-                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0 justify-end">
+                    <Filter className="w-3.5 h-3.5 text-slate-400" />
+                    <select
+                      value={filtroMinMatch}
+                      onChange={(e) => setFiltroMinMatch(Number(e.target.value))}
+                      className="text-xs py-1.5 px-2 bg-white border border-slate-300 rounded-lg outline-none text-slate-700"
                     >
-                      Em Análise
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatusCandidatura(candidato.id, 'aprovado')}
-                      className={`px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors ${
-                        candidato.status === 'aprovado'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      Aprovar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleUpdateStatusCandidatura(candidato.id, 'rejeitado')}
-                      className={`px-2.5 py-1.5 rounded text-[11px] font-medium transition-colors ${
-                        candidato.status === 'rejeitado'
-                          ? 'bg-red-100 text-red-800'
-                          : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-100'
-                      }`}
-                    >
-                      Rejeitar
-                    </button>
+                      <option value={0}>Todos os Matchs</option>
+                      <option value={40}>Apenas Match ≥ 40%</option>
+                      <option value={70}>Alto Match ≥ 70%</option>
+                    </select>
                   </div>
                 </div>
+
+                {alunosMatchFiltrados.length === 0 ? (
+                  <div className="py-8 text-center text-slate-500 space-y-1.5">
+                    <Users className="w-7 h-7 text-slate-400 mx-auto" />
+                    <p className="text-xs font-medium">Nenhum aluno encontrado com estes filtros.</p>
+                    <p className="text-[11px] text-slate-400">
+                      Tente limpar a busca ou selecionar &quot;Todos os Matchs&quot;.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
+                    {alunosMatchFiltrados.map(
+                      ({
+                        aluno,
+                        aderenciaPorcentagem,
+                        competenciasEmComum,
+                        competenciasFaltantes,
+                        jaInscrito,
+                        statusCandidatura,
+                      }) => (
+                        <div
+                          key={aluno.id}
+                          className="p-3.5 sm:p-4 border border-slate-200/90 rounded-xl bg-white shadow-2xs space-y-2.5 hover:border-slate-300 transition-colors"
+                        >
+                          {/* Cabeçalho do Aluno com Badge de Match */}
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="text-sm font-bold text-slate-900">
+                                  {aluno.nome}
+                                </h4>
+                                {jaInscrito ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                    Inscrito {statusCandidatura ? `(${statusCandidatura})` : ''}
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-slate-400 font-medium bg-slate-100 px-1.5 py-0.5 rounded">
+                                    Não inscrito
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-slate-500 mt-0.5">{aluno.email}</p>
+                              {(aluno.curso || aluno.graduacao) && (
+                                <p className="text-[11px] text-slate-600 mt-0.5 flex items-center gap-1">
+                                  <GraduationCap className="w-3.5 h-3.5 text-slate-400" />
+                                  <span>{aluno.curso || aluno.graduacao}</span>
+                                  {aluno.periodo && <span>• {aluno.periodo}</span>}
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Score de Aderência */}
+                            <div className="flex sm:flex-col items-start sm:items-end gap-1">
+                              <span
+                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                                  aderenciaPorcentagem >= 70
+                                    ? 'bg-[#084734]/10 text-[#084734] border-[#084734]/25'
+                                    : aderenciaPorcentagem >= 40
+                                    ? 'bg-blue-50 text-blue-800 border-blue-200'
+                                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                                }`}
+                              >
+                                <Sparkles className="w-3 h-3" />
+                                {aderenciaPorcentagem}% Match
+                              </span>
+                              <span className="text-[10px] text-slate-400">
+                                {competenciasEmComum.length} de{' '}
+                                {selectedVaga.competenciasNecessarias?.length || 0} requisitos
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Competências em Comum (Match) e Faltantes */}
+                          <div className="pt-2 border-t border-slate-100 space-y-1.5 text-xs">
+                            {competenciasEmComum.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="text-[10px] font-semibold text-emerald-800 mr-1 flex items-center gap-1">
+                                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  Atende:
+                                </span>
+                                {competenciasEmComum.map((comp) => (
+                                  <span
+                                    key={comp}
+                                    className="px-2 py-0.5 rounded text-[10px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"
+                                  >
+                                    {comp}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {competenciasFaltantes.length > 0 && (
+                              <div className="flex flex-wrap items-center gap-1">
+                                <span className="text-[10px] font-semibold text-slate-400 mr-1">
+                                  Requisitos faltantes:
+                                </span>
+                                {competenciasFaltantes.map((comp) => (
+                                  <span
+                                    key={comp}
+                                    className="px-2 py-0.5 rounded text-[10px] font-normal bg-slate-50 text-slate-500 border border-slate-200"
+                                  >
+                                    {comp}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Rodapé do Card do Aluno: Link de Currículo */}
+                          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-xs">
+                            <span className="text-[11px] text-slate-400">
+                              {aluno.competencias?.length || 0} competência(s) no currículo
+                            </span>
+                            {aluno.curriculoUrl ? (
+                              <a
+                                href={aluno.curriculoUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-fia-accent hover:underline font-medium text-xs"
+                              >
+                                <FileText className="w-3.5 h-3.5" />
+                                Ver Currículo PDF
+                                <ExternalLink className="w-3 h-3" />
+                              </a>
+                            ) : (
+                              <span className="text-[11px] text-slate-400 italic">
+                                Currículo não anexado
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                )}
               </div>
-            ))}
+            )}
           </div>
         )}
       </Modal>

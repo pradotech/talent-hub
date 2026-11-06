@@ -196,9 +196,11 @@ export const VagaCard: React.FC<VagaCardProps> = ({
               <button
                 type="button"
                 onClick={() => onManageCandidates && onManageCandidates(vaga)}
-                className="px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-all shadow-2xs cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-800 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-all shadow-2xs cursor-pointer"
+                title="Ver inscritos e alunos com afinidade de competências"
               >
-                Inscritos
+                <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Inscritos & Match</span>
               </button>
               {onToggleStatus && (
                 <button
