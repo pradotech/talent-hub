@@ -273,8 +273,13 @@ export const alunosService = {
   async obterUrlVisualizacaoCurriculo(pathOuUrl?: string): Promise<string> {
     if (!pathOuUrl) return '';
 
-    // Se já for Base64 (data:) ou Blob local válido
-    if (pathOuUrl.startsWith('data:') || pathOuUrl.startsWith('blob:')) {
+    // Se for URL temporária antiga de blob, o Chrome bloqueia a navegação externa com 'Not allowed to load local resource'
+    if (pathOuUrl.startsWith('blob:')) {
+      return '';
+    }
+
+    // Se já for Base64 (data:)
+    if (pathOuUrl.startsWith('data:')) {
       return pathOuUrl;
     }
 

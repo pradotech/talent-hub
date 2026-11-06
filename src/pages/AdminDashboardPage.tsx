@@ -56,6 +56,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
   const [modalTab, setModalTab] = useState<'inscritos' | 'match'>('inscritos');
   const [searchAlunoMatch, setSearchAlunoMatch] = useState<string>('');
   const [filtroMinMatch, setFiltroMinMatch] = useState<number>(0);
+  const [alunoCurriculoModal, setAlunoCurriculoModal] = useState<Aluno | null>(null);
 
   const carregarDados = async () => {
     setIsLoading(true);
@@ -107,15 +108,50 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
     }
   };
 
-  const handleAbrirCurriculo = async (urlOuPath?: string) => {
-    if (!urlOuPath) return;
+  const handleAbrirCurriculo = async (
+    alunoRef?: Aluno | { alunoId?: string; alunoNome?: string; alunoEmail?: string; alunoCurriculoUrl?: string; alunoCompetencias?: string[] }
+  ) => {
+    if (!alunoRef) return;
+
+    // Localiza o aluno completo ou monta estrutura compatível
+    const alunoCompleto: Aluno | undefined =
+      'competencias' in alunoRef
+        ? (alunoRef as Aluno)
+        : alunos.find(
+            (a) =>
+              a.id === alunoRef.alunoId ||
+              (alunoRef.alunoEmail && a.email.toLowerCase() === alunoRef.alunoEmail.toLowerCase())
+          ) || {
+            id: alunoRef.alunoId || 'aluno-temp',
+            usuarioId: alunoRef.alunoId || 'aluno-temp',
+            nome: alunoRef.alunoNome || 'Aluno',
+            email: alunoRef.alunoEmail || '',
+            competencias: alunoRef.alunoCompetencias || [],
+            curriculoUrl: alunoRef.alunoCurriculoUrl,
+          };
+
+    const url = alunoCompleto?.curriculoUrl;
+
+    // Se o currículo é anterior à criação do bucket (link blob temporário que o Chrome bloqueia)
+    // ou se não possui link direto na nuvem, abre a visualização institucional dos dados do currículo
+    if (!url || url.startsWith('blob:')) {
+      if (alunoCompleto) {
+        setAlunoCurriculoModal(alunoCompleto);
+      }
+      return;
+    }
+
     try {
-      const targetUrl = await alunosService.obterUrlVisualizacaoCurriculo(urlOuPath);
+      const targetUrl = await alunosService.obterUrlVisualizacaoCurriculo(url);
       if (targetUrl) {
         window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      } else if (alunoCompleto) {
+        setAlunoCurriculoModal(alunoCompleto);
       }
-    } catch (err) {
-      console.error('Falha ao abrir currículo do aluno:', err);
+    } catch {
+      if (alunoCompleto) {
+        setAlunoCurriculoModal(alunoCompleto);
+      }
     }
   };
 
@@ -416,7 +452,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
                         {alunoItem.curriculoUrl ? (
                           <button
                             type="button"
-                            onClick={() => handleAbrirCurriculo(alunoItem.curriculoUrl)}
+                            onClick={() => handleAbrirCurriculo(alunoItem)}
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
                           >
                             <FileText className="w-3.5 h-3.5" />
@@ -617,7 +653,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
                             {candidato.alunoCurriculoUrl ? (
                               <button
                                 type="button"
-                                onClick={() => handleAbrirCurriculo(candidato.alunoCurriculoUrl)}
+                                onClick={() => handleAbrirCurriculo(candidato)}
                                 className="inline-flex items-center gap-1 text-fia-accent hover:underline font-medium self-start cursor-pointer"
                               >
                                 <FileText className="w-3.5 h-3.5" />
@@ -820,7 +856,7 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
                             {aluno.curriculoUrl ? (
                               <button
                                 type="button"
-                                onClick={() => handleAbrirCurriculo(aluno.curriculoUrl)}
+                                onClick={() => handleAbrirCurriculo(aluno)}
                                 className="inline-flex items-center gap-1 text-fia-accent hover:underline font-medium text-xs cursor-pointer"
                               >
                                 <FileText className="w-3.5 h-3.5" />
@@ -840,6 +876,100 @@ export const AdminDashboardPage: React.FC<AdminDashboardPageProps> = ({ initialT
                 )}
               </div>
             )}
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal de Visualização Web do Currículo do Aluno */}
+      <Modal
+        isOpen={!!alunoCurriculoModal}
+        onClose={() => setAlunoCurriculoModal(null)}
+        title={alunoCurriculoModal ? `Currículo: ${alunoCurriculoModal.nome}` : 'Currículo do Aluno'}
+        subtitle={alunoCurriculoModal?.email}
+        maxWidth="2xl"
+      >
+        {alunoCurriculoModal && (
+          <div className="space-y-4">
+            {alunoCurriculoModal.curriculoUrl?.startsWith('blob:') && (
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
+                <span className="text-base shrink-0">ℹ️</span>
+                <div>
+                  <strong className="block font-bold">Currículo cadastrado antes da ativação do bucket privado.</strong>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    O arquivo físico desse teste foi gravado em sessão local anterior (blob). 
+                    Todas as informações extraídas do currículo estão consolidadas abaixo para consulta:
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Aluno</span>
+                <p className="font-bold text-slate-900 text-sm">{alunoCurriculoModal.nome}</p>
+                <p className="text-slate-500 text-[11px] mt-0.5">{alunoCurriculoModal.email}</p>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-0.5">Idade</span>
+                <p className="font-semibold text-slate-800">
+                  {alunoCurriculoModal.idade ? `${alunoCurriculoModal.idade} anos` : 'Não informada'}
+                </p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                Formação Acadêmica & Cursos
+              </span>
+              <p className="font-semibold text-slate-800">
+                {alunoCurriculoModal.graduacao || alunoCurriculoModal.curso || 'Não informada'}
+              </p>
+              {alunoCurriculoModal.periodo && (
+                <p className="text-[11px] text-slate-500">Período: {alunoCurriculoModal.periodo}</p>
+              )}
+            </div>
+
+            {alunoCurriculoModal.experiencia && (
+              <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs space-y-1">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                  Experiência Profissional & Trajetória
+                </span>
+                <p className="text-slate-700 whitespace-pre-line leading-relaxed">
+                  {alunoCurriculoModal.experiencia}
+                </p>
+              </div>
+            )}
+
+            <div className="space-y-1.5 pt-2 border-t border-slate-100">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                Competências Mapeadas ({alunoCurriculoModal.competencias?.length || 0}):
+              </span>
+              <div className="flex flex-wrap gap-1.5">
+                {alunoCurriculoModal.competencias?.map((comp) => (
+                  <span
+                    key={comp}
+                    className="px-2 py-0.5 rounded text-[11px] font-medium bg-emerald-50 text-emerald-800 border border-emerald-200"
+                  >
+                    {comp}
+                  </span>
+                ))}
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-200 text-[11px] text-slate-400 flex items-center justify-between">
+              <span>
+                {alunoCurriculoModal.curriculoNomeArquivo
+                  ? `Arquivo submetido: ${alunoCurriculoModal.curriculoNomeArquivo}`
+                  : 'Currículo FIA Talent Hub'}
+              </span>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="px-2.5 py-1 text-slate-600 bg-white border border-slate-200 rounded hover:bg-slate-50 transition-colors cursor-pointer"
+              >
+                Imprimir / Salvar PDF
+              </button>
+            </div>
           </div>
         )}
       </Modal>
